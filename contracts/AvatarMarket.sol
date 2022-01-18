@@ -11,6 +11,7 @@ contract AvatarMarket is BaseAccessControl, ReentrancyGuard, Pausable {
     
     string public constant BAD_ADDRESS_ERROR = "AvatarMarket: bad address";
     string public constant BAD_COUNT_ERROR = "AvatarMarket: bad count";
+    string public constant TOTAL_SUPPLY_LIMIT_ERROR = "AvatarMarket: total supply exceeded";
     string public constant BAD_AMOUNT_ERROR = "AvatarMarket: incorrect amount sent to the contract";
     string public constant ALLOW_PRESALE_ERROR = "AvatarMarket: unable to allow presale"; 
     string public constant PRESALE_COUNT_TOTAL_LIMIT_ERROR = "AvatarMarket: exceed total allowed presale count";
@@ -90,7 +91,7 @@ contract AvatarMarket is BaseAccessControl, ReentrancyGuard, Pausable {
     function allowPresale(uint presaleCount, uint price) external onlyRole(CFO_ROLE) {
         require(!publicSaleStarted(), ALLOW_PRESALE_ERROR);
         uint totalTokenSupply = AvatarToken(tokenAddress()).totalTokenSupply();
-        require(presaleRemainingCount() + presaleCount <= totalTokenSupply, BAD_COUNT_ERROR);
+        require(presaleRemainingCount() + presaleCount <= totalTokenSupply, TOTAL_SUPPLY_LIMIT_ERROR);
         
         _totalAllowedPresaleCount = presaleCount;
         _presalePrice = price;
@@ -161,7 +162,7 @@ contract AvatarMarket is BaseAccessControl, ReentrancyGuard, Pausable {
         AvatarToken at = AvatarToken(tokenAddress());
         uint totalTokenSupply = at.totalTokenSupply();
         uint currentTokenCount = at.currentTokenCount();
-        require(presaleRemainingCount() + currentTokenCount + count <= totalTokenSupply, BAD_COUNT_ERROR);
+        require(presaleRemainingCount() + currentTokenCount + count <= totalTokenSupply, TOTAL_SUPPLY_LIMIT_ERROR);
         require(msg.value >= count * publicPrice(), BAD_AMOUNT_ERROR);
         
         for (uint i = 0; i < count; i++) {
