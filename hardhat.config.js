@@ -15,6 +15,10 @@ module.exports = {
       url: process.env.NETWORK_URL,
       accounts: [process.env.PRIVATE_KEY],
     },
+    ropsten: {
+      url: process.env.NETWORK_URL,
+      accounts: [process.env.PRIVATE_KEY],
+    },
     // main: {
     //   url: process.env.NETWORK_URL,
     //   accounts: [process.env.PRIVATE_KEY],

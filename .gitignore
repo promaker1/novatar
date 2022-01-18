@@ -7,3 +7,5 @@ typechain
 #Hardhat files
 cache
 artifacts
+contracts.json
+verify_contracts.sh
