@@ -31,15 +31,13 @@ async function main() {
 
   const AvatarToken = await ethers.getContractFactory("AvatarToken");
   const totalSupply = 25000;
-  const defaultBabyCid = "DEFAULT_BABY_CID"; // must be set to an actual CID.
-  const defaultAdultCid = "DEFAULT_ADULT_CID"; // must be set to an actual CID.
+  const baseCid = "DEFAULT_BABY_CID"; // must be set to an actual CID.
   const growUpTime = 30 * 24 * 60 * 60; // 1 month, in secs
   const priceOfGrowingUp = ethers.utils.parseEther("0.05"); // price of growing up, in wei. Must be set to an actual value.
 
   const token = await AvatarToken.deploy(
     totalSupply,
-    defaultBabyCid,
-    defaultAdultCid,
+    baseCid,
     growUpTime,
     priceOfGrowingUp,
     manager.address
@@ -48,7 +46,7 @@ async function main() {
   console.log("Avatar token address:", token.address);
   contractsJson.write(`\t"token":"${token.address}",\n`);
   verifyContracts.write(
-    `npx hardhat verify --network ${network} ${token.address} ${totalSupply} ${defaultBabyCid} ${defaultAdultCid} ${growUpTime} ${priceOfGrowingUp} ${manager.address}\n`
+    `npx hardhat verify --network ${network} ${token.address} ${totalSupply} ${baseCid} ${growUpTime} ${priceOfGrowingUp} ${manager.address}\n`
   );
 
   const AvatarMarket = await ethers.getContractFactory("AvatarMarket");

@@ -12,10 +12,10 @@ contract AvatarMarket is BaseAccessControl, ReentrancyGuard, Pausable {
     string public constant BAD_ADDRESS_ERROR = "AvatarMarket: bad address";
     string public constant BAD_COUNT_ERROR = "AvatarMarket: bad count";
     string public constant TOTAL_SUPPLY_LIMIT_ERROR = "AvatarMarket: total supply exceeded";
-    string public constant BAD_AMOUNT_ERROR = "AvatarMarket: incorrect amount sent to the contract";
+    string public constant BAD_AMOUNT_ERROR = "AvatarMarket: bad amount";
     string public constant ALLOW_PRESALE_ERROR = "AvatarMarket: unable to allow presale"; 
-    string public constant PRESALE_COUNT_TOTAL_LIMIT_ERROR = "AvatarMarket: exceed total allowed presale count";
-    string public constant PRESALE_COUNT_USER_LIMIT_ERROR = "AvatarMarket: exceed max presale count per user";
+    string public constant PRESALE_COUNT_TOTAL_LIMIT_ERROR = "AvatarMarket: total allowed presale exceeded";
+    string public constant PRESALE_COUNT_USER_LIMIT_ERROR = "AvatarMarket: presale count per user exceeded";
     string public constant CLAIM_ERROR = "AvatarMarket: unable to claim";
 
     using Address for address payable;

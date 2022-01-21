@@ -1,8 +1,10 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("Baby Adult", function () {
+describe("Avatar Token", function () {
   let token;
+  let manager;
+  let owner;
   let addr1;
   let addr2;
 
@@ -13,13 +15,41 @@ describe("Baby Adult", function () {
   let growUpTimeError;
   let growUpAdultError;
 
-  const avatarBaseUri = "https://babyadult.com/avatars/";
+  let ceoRole;
+  let cooRole;
+  let cfoRole;
+
+  const baseCid = "DEFAULT_CID";
 
   beforeEach(async function () {
-    [addr1, addr2] = await ethers.getSigners();
+    [owner, addr1, addr2] = await ethers.getSigners();
 
-    const babyAdultToken = await ethers.getContractFactory("BabyAdult");
-    token = await babyAdultToken.deploy(avatarBaseUri);
+    const accessControlManager = await ethers.getContractFactory(
+      "AccessControlManager"
+    );
+    manager = await accessControlManager.deploy();
+    await manager.deployed();
+
+    ceoRole = await manager.CEO_ROLE.call();
+    cooRole = await manager.COO_ROLE.call();
+    cfoRole = await manager.CFO_ROLE.call();
+
+    await manager.grantRole(ceoRole, owner.address);
+    await manager.grantRole(cooRole, owner.address);
+    await manager.grantRole(cfoRole, owner.address);
+
+    const avatarToken = await ethers.getContractFactory("AvatarToken");
+    const totalSupply = 10;
+    const growUpTime = 30 * 24 * 60 * 60;
+    const priceOfGrowingUp = ethers.utils.parseEther("0.05");
+
+    token = await avatarToken.deploy(
+      totalSupply,
+      baseCid,
+      growUpTime,
+      priceOfGrowingUp,
+      manager.address
+    );
     await token.deployed();
 
     nonExistentTokenError = await token.NON_EXISTENT_TOKEN_ERROR.call();

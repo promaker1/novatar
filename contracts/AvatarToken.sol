@@ -13,12 +13,10 @@ import "./structs/AvatarInfo.sol";
 contract AvatarToken is ERC721, BaseAccessControl, Pausable {
 
     string public constant NON_EXISTENT_TOKEN_ERROR = "AvatarToken: nonexistent token";  
-    string public constant NOT_ENOUGH_PRIVILEGES_ERROR = "AvatarToken: not enough privileges to call the method";
-    string public constant CID_ALREADY_SET_ERROR = "AvatarToken: CID is already set";
-    string public constant BAD_IPFS_CID_ERROR = "AvatarToken: bad CID";
+    string public constant NOT_ENOUGH_PRIVILEGES_ERROR = "AvatarToken: not enough privileges";
     string public constant BAD_ADDRESS_ERROR = "AvatarToken: bad address";
-    string public constant BAD_AMOUNT_ERROR = "AvatarToken: incorrect amount sent to the contract";
-    string public constant SUPPLY_LIMIT_ERROR = "AvatarToken: total token supply has exceeded";
+    string public constant BAD_AMOUNT_ERROR = "AvatarToken: bad amount";
+    string public constant SUPPLY_LIMIT_ERROR = "AvatarToken: total supply has exceeded";
     string public constant GROW_UP_OWNER_ERROR = "AvatarToken: caller is not owner";
     string public constant GROW_UP_TIME_ERROR = "AvatarToken: it is not time to grow up";
     string public constant GROW_UP_ADULT_ERROR = "AvatarToken: already adult";  
@@ -33,33 +31,30 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
 
     address private _avatarMarketAddress;
     uint private _growTime; //in secs
-    string private _babyAvatarBaseCid;
-    string private _defaultBabyCid;
-    string private _defaultAdultCid;
+    string private _baseCid;
     uint private _priceOfGrowingUp;
     uint private _totalTokenSupply;
+    
+    uint private _revealUpperBound;
 
     // Mapping token id to avatar details
     mapping(uint => uint) private _info;
-    // Mapping token id to adult cid
-    mapping(uint => string) private _adultCids;
 
-    event AvatarCreated(address indexed caller, address indexed to, uint tokenId);
-    event AvatarGrown(address indexed caller, uint tokenId);
+    event AvatarCreated(address indexed operator, address indexed to, uint tokenId);
+    event AvatarGrown(address indexed operator, uint tokenId);
+    event SetAdultImage(address indexed operator, uint tokenId, bool value);
     event EthersWithdrawn(address operator, address indexed to, uint amount);
 
     constructor(
         uint totalSupply,
-        string memory defaultBabyCid, 
-        string memory defaultAdultCid, 
+        string memory bCid,
         uint gt, uint price, 
         address accessControl) 
         ERC721("Baby-Adult Avatar", "BAA") 
         BaseAccessControl(accessControl) {
 
         _totalTokenSupply = totalSupply;
-        _defaultBabyCid = defaultBabyCid;
-        _defaultAdultCid = defaultAdultCid;
+        _baseCid = bCid;
         _growTime = gt;
         _priceOfGrowingUp = price;
     }
@@ -104,52 +99,41 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
         emit ValueChanged("priceOfGrowingUp", previousValue, newValue);
     }
 
-    function defaultBabyMetadataCid() public view returns (string memory) {
-        return _defaultBabyCid;
+    function baseCid() public view returns (string memory) {
+        return _baseCid;
     }
 
-    function setDefaultBabyMetadataCid(string memory newValue) external onlyRole(COO_ROLE) {
-        string memory previousValue = newValue;
-        _defaultBabyCid = newValue;
-        emit StringValueChanged("defaultBabyCid", previousValue, newValue);
+    function setBaseCid(string memory newValue) external onlyRole(COO_ROLE) {
+        string memory previousValue = _baseCid;
+        _baseCid = newValue;
+        emit StringValueChanged("baseCid", previousValue, newValue);
     }
 
-    function defaultAdultMetadataCid() public view returns (string memory) {
-        return _defaultAdultCid;
+    function revealBabyAvatars(uint upperBound) external onlyRole(COO_ROLE) {
+        uint previousValue = _revealUpperBound;
+        _revealUpperBound = upperBound;
+        emit ValueChanged("upperBound", previousValue, upperBound);
     }
 
-    function setDefaultAdultMetadataCid(string memory newValue) external onlyRole(COO_ROLE) {
-        string memory previousValue = newValue;
-        _defaultAdultCid = newValue;
-        emit StringValueChanged("defaultAdultCid", previousValue, newValue);
-    }
+    function setAdultImage(uint tokenId, bool value) external onlyRole(COO_ROLE) {
+        require(_exists(tokenId), NON_EXISTENT_TOKEN_ERROR);
+        
+        AvatarInfo.Details memory details = AvatarInfo.getDetails(_info[tokenId]);
+        details.hasAdultImage = value;
+        _info[tokenId] = AvatarInfo.getValue(details);
 
-    function babyAvatarBaseCid() public view returns (string memory) {
-        return _babyAvatarBaseCid;
-    }
-
-    function revealBabyAvatars(string calldata baseCid) external onlyRole(COO_ROLE) {
-        string memory previousValue = _babyAvatarBaseCid;
-        _babyAvatarBaseCid = baseCid;
-        emit StringValueChanged("babyAvatarBaseCid", previousValue, baseCid);
-    }
-
-    function hasAdultMetadataCid(uint tokenId) public view returns (bool) {
-        return bytes(_adultCids[tokenId]).length > 0;
-    }
-
-    function setAdultMetadataCid(uint tokenId, string memory cid) external onlyRole(COO_ROLE) {
-        require(bytes(cid).length >= 46, BAD_IPFS_CID_ERROR);
-        require(!hasAdultMetadataCid(tokenId), CID_ALREADY_SET_ERROR);
-
-        string memory previousValue = _adultCids[tokenId];
-        _adultCids[tokenId] = cid;
-        emit StringValueChanged(string(abi.encodePacked("adultCids.", tokenId)), previousValue, cid);
+        emit SetAdultImage(_msgSender(), tokenId, value);
     }
 
     function avatar(uint tokenId) external view returns (AvatarInfo.Details memory) {
         require(_exists(tokenId), NON_EXISTENT_TOKEN_ERROR);
         return AvatarInfo.getDetails(_info[tokenId]);
+    }
+
+    function hasAdultImage(uint tokenId) public view returns (bool) {
+        require(_exists(tokenId), NON_EXISTENT_TOKEN_ERROR);
+        AvatarInfo.Details memory details = AvatarInfo.getDetails(_info[tokenId]);
+        return details.hasAdultImage;
     }
 
     function isAdult(uint tokenId) public view returns (bool) {
@@ -160,17 +144,21 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         require(_exists(tokenId), NON_EXISTENT_TOKEN_ERROR);
-
-        if (isAdult(tokenId)) {
-            string memory cid = _adultCids[tokenId];
-            return string(abi.encodePacked("ipfs://", (bytes(cid).length > 0) ? cid : defaultAdultMetadataCid()));
-        }
-        else if (bytes(babyAvatarBaseCid()).length > 0) {  //if revealed
-            return string(abi.encodePacked("ipfs://", babyAvatarBaseCid(), "/", tokenId, ".json"));
-        }
-        else {
-            return string(abi.encodePacked("ipfs://", defaultBabyMetadataCid()));
-        }
+        AvatarInfo.Details memory details = AvatarInfo.getDetails(_info[tokenId]);
+        string memory path = (details.grownAt > 0)
+            ? string(
+                abi.encodePacked(
+                    baseCid(), 
+                    "/adult/", 
+                    details.hasAdultImage ? tokenId.toString() : "default", 
+                    ".json"))
+            : string(
+                abi.encodePacked(
+                    baseCid(), 
+                    "/baby/", 
+                    (tokenId <= _revealUpperBound) ? tokenId.toString() : "default",
+                    ".json"));
+        return string(abi.encodePacked("ipfs://", path));
     }
 
     function mint(address to) external returns (uint) {
@@ -182,7 +170,8 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
         uint newAvatarId = uint(_avatarIds.current());
         _info[newAvatarId] = AvatarInfo.getValue(AvatarInfo.Details({
             mintedAt: block.timestamp,
-            grownAt: 0
+            grownAt: 0,
+            hasAdultImage: false
         }));
         _mint(to, newAvatarId);
 
