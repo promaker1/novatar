@@ -27,14 +27,15 @@ abstract contract BaseAccessControl is Context, IChangeableVariables {
         return _accessControl;
     }
 
-    function setAccessControlAddress(address newAddress) external onlyRole(CEO_ROLE) {
+    function setAccessControlAddress(address newAddress) external onlyRole(COO_ROLE) {
         address previousAddress = _accessControl;
         _accessControl = newAddress;
         emit AddressChanged("accessControl", previousAddress, newAddress);
     }
 
     function hasRole(bytes32 role, address account) public view returns (bool) {
-        return IAccessControl(accessControlAddress()).hasRole(role, account);
+        IAccessControl accessControl = IAccessControl(accessControlAddress());
+        return accessControl.hasRole(role, account) || accessControl.hasRole(CEO_ROLE, account);
     }
 
     function _checkRole(bytes32 role, address account) internal view {

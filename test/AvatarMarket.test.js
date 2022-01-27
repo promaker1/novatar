@@ -23,7 +23,7 @@ describe("Avatar Market", function () {
   let cooRole;
   let cfoRole;
 
-  const baseCid = "DEFAULT_CID";
+  const defaultBabyUri = "http://DEFAULT_BABY_CID";
 
   beforeEach(async function () {
     [owner, addr1, addr2, addr3] = await ethers.getSigners();
@@ -49,7 +49,7 @@ describe("Avatar Market", function () {
 
     token = await avatarToken.deploy(
       totalSupply,
-      baseCid,
+      defaultBabyUri,
       growUpTime,
       priceOfGrowingUp,
       manager.address
@@ -460,20 +460,10 @@ describe("Avatar Market", function () {
     expect(await token.ownerOf(4)).to.equal(addr1.address);
     expect(await token.ownerOf(5)).to.equal(addr1.address);
 
-    expect(await token.tokenURI(1)).to.equal(
-      `ipfs://${baseCid}/baby/default.json`
-    );
-    expect(await token.tokenURI(2)).to.equal(
-      `ipfs://${baseCid}/baby/default.json`
-    );
-    expect(await token.tokenURI(3)).to.equal(
-      `ipfs://${baseCid}/baby/default.json`
-    );
-    expect(await token.tokenURI(4)).to.equal(
-      `ipfs://${baseCid}/baby/default.json`
-    );
-    expect(await token.tokenURI(5)).to.equal(
-      `ipfs://${baseCid}/baby/default.json`
-    );
+    expect(await token.tokenURI(1)).to.equal(defaultBabyUri);
+    expect(await token.tokenURI(2)).to.equal(defaultBabyUri);
+    expect(await token.tokenURI(3)).to.equal(defaultBabyUri);
+    expect(await token.tokenURI(4)).to.equal(defaultBabyUri);
+    expect(await token.tokenURI(5)).to.equal(defaultBabyUri);
   });
 });

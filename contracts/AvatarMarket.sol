@@ -50,7 +50,7 @@ contract AvatarMarket is BaseAccessControl, ReentrancyGuard, Pausable {
         return _tokenAddress;
     }
 
-    function setTokenAddress(address newAddress) external onlyRole(CEO_ROLE) {
+    function setTokenAddress(address newAddress) external onlyRole(COO_ROLE) {
         address previousAddress = _tokenAddress;
         _tokenAddress = newAddress;
         emit AddressChanged("token", previousAddress, newAddress);
