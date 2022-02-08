@@ -31,7 +31,12 @@ describe("Avatar Market", function () {
     const accessControlManager = await ethers.getContractFactory(
       "AccessControlManager"
     );
-    manager = await accessControlManager.deploy();
+    manager = await accessControlManager.deploy(
+      owner.address,
+      owner.address,
+      owner.address,
+      owner.address
+    );
     await manager.deployed();
 
     ceoRole = await manager.CEO_ROLE.call();
@@ -52,7 +57,8 @@ describe("Avatar Market", function () {
       defaultBabyUri,
       growUpTime,
       priceOfGrowingUp,
-      manager.address
+      manager.address,
+      false
     );
     await token.deployed();
 

@@ -22,11 +22,16 @@ async function main() {
   const AccessControlManager = await ethers.getContractFactory(
     "AccessControlManager"
   );
-  const manager = await AccessControlManager.deploy();
+  const manager = await AccessControlManager.deploy(
+    deployer.address,
+    ceo,
+    coo,
+    cfo
+  );
   console.log("Access control manager address:", manager.address);
   contractsJson.write(`{\n\t"manager":"${manager.address}",\n`);
   verifyContracts.write(
-    `npx hardhat verify --network ${network} ${manager.address}\n`
+    `npx hardhat verify --network ${network} ${manager.address} ${deployer.address} ${ceo} ${coo} ${cfo}\n`
   );
 
   const AvatarToken = await ethers.getContractFactory("AvatarToken");

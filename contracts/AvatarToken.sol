@@ -38,13 +38,14 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
     uint private _priceOfGrowingUp;
     uint private _totalTokenSupply;
     string private _defaultBabyUri;
+    bool private _testMode;
 
     uint private _revealedAt = 0;
 
     // Mapping token id to avatar details
     mapping(uint => uint) private _info;
 
-    event SetBaseURI(address indexed operator, string baseUri);
+    event Revealed(address indexed operator, string baseUri);
     event AvatarCreated(address indexed operator, address indexed to, uint tokenId);
     event AvatarGrown(address indexed operator, uint tokenId);
     event SetAdultImage(address indexed operator, uint tokenId);
@@ -54,13 +55,15 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
         uint totalSupply,
         string memory defaultBabyUri,
         uint gt, uint price, 
-        address accessControl) 
+        address accessControl,
+        bool testMode) 
         ERC721("Novatar", "NVT") 
         BaseAccessControl(accessControl) {
         _totalTokenSupply = totalSupply;
         _defaultBabyUri = defaultBabyUri;
         _growTime = gt;
         _priceOfGrowingUp = price;
+        _testMode = testMode;
     }
 
     function totalTokenSupply() public view returns (uint) {
@@ -117,13 +120,13 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
         return _baseUri;
     }
 
-    function setBaseURI(string memory baseUri) external onlyRole(COO_ROLE) {
+    function revealBabyAvatars(string memory baseUri) external onlyRole(COO_ROLE) {
         require(_revealedAt == 0, COLLECTION_REVEALED_ERROR);
         
         _baseUri = baseUri;
         _revealedAt = block.timestamp;
         
-        emit SetBaseURI(_msgSender(), baseUri);
+        emit Revealed(_msgSender(), baseUri);
     } 
 
     function setAdultImage(uint tokenId) external onlyRole(COO_ROLE) {
@@ -176,7 +179,7 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
     }
 
     function mint(address to) external returns (uint) {
-        require(_msgSender() == avatarMarketAddress() || hasRole(CEO_ROLE, _msgSender()), NOT_ENOUGH_PRIVILEGES_ERROR);
+        require(_testMode || _msgSender() == avatarMarketAddress(), NOT_ENOUGH_PRIVILEGES_ERROR);
         require(!to.isContract(), BAD_ADDRESS_ERROR);
         require(currentTokenCount() < totalTokenSupply(), SUPPLY_LIMIT_ERROR);
         

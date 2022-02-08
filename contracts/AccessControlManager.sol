@@ -13,12 +13,16 @@ contract AccessControlManager is AccessControl {
 
     mapping(bytes32 => uint) private _roleCounters;
 
-    constructor() AccessControl() {
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(CEO_ROLE, _msgSender());
+    constructor(address admin, address ceo, address coo, address cfo) AccessControl() {
+        _setupRole(DEFAULT_ADMIN_ROLE, admin);
+        _setupRole(CEO_ROLE, ceo);
+        _setupRole(COO_ROLE, coo);
+        _setupRole(CFO_ROLE, cfo);
 
         _roleCounters[DEFAULT_ADMIN_ROLE] = 1;
         _roleCounters[CEO_ROLE] = 1;
+        _roleCounters[COO_ROLE] = 1;
+        _roleCounters[CFO_ROLE] = 1;
         
         _setRoleAdmin(COO_ROLE, CEO_ROLE);
         _setRoleAdmin(CFO_ROLE, CEO_ROLE);

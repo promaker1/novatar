@@ -14,7 +14,12 @@ describe("Access Control Manager", function () {
     const accessControl = await ethers.getContractFactory(
       "AccessControlManager"
     );
-    manager = await accessControl.deploy();
+    manager = await accessControl.deploy(
+      owner.address,
+      owner.address,
+      owner.address,
+      owner.address
+    );
     await manager.deployed();
 
     ceoRole = await manager.CEO_ROLE.call();

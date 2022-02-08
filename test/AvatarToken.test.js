@@ -3,6 +3,7 @@ const { ethers } = require("hardhat");
 
 describe("Avatar Token", function () {
   let token;
+  let token0;
   let market;
   let manager;
   let owner;
@@ -36,7 +37,12 @@ describe("Avatar Token", function () {
     const accessControlManager = await ethers.getContractFactory(
       "AccessControlManager"
     );
-    manager = await accessControlManager.deploy();
+    manager = await accessControlManager.deploy(
+      owner.address,
+      owner.address,
+      owner.address,
+      owner.address
+    );
     await manager.deployed();
 
     ceoRole = await manager.CEO_ROLE.call();
@@ -49,12 +55,23 @@ describe("Avatar Token", function () {
 
     const avatarToken = await ethers.getContractFactory("AvatarToken");
 
+    token0 = await avatarToken.deploy(
+      totalSupply,
+      defaultBabyUri,
+      growUpTime,
+      priceOfGrowingUp,
+      manager.address,
+      false
+    );
+    await token0.deployed();
+
     token = await avatarToken.deploy(
       totalSupply,
       defaultBabyUri,
       growUpTime,
       priceOfGrowingUp,
-      manager.address
+      manager.address,
+      true
     );
     await token.deployed();
 
@@ -108,7 +125,7 @@ describe("Avatar Token", function () {
 
   it("Only a user with COO role can set a base URI and reveal the tokens", async function () {
     await expect(
-      token.connect(addr1).setBaseURI("ipfs://base_uri")
+      token.connect(addr1).revealBabyAvatars("ipfs://base_uri")
     ).to.be.revertedWith(
       `AccessControl: account ${addr1.address
         .toString()
@@ -160,8 +177,8 @@ describe("Avatar Token", function () {
     );
   });
 
-  it("Only a user with CEO role or the market contract can mint new avatars", async function () {
-    await expect(token.connect(addr1).mint(addr1.address)).to.be.revertedWith(
+  it("Only the market contract can invoke minting of new avatars", async function () {
+    await expect(token0.connect(addr1).mint(addr1.address)).to.be.revertedWith(
       notEnoughPrivilegesError
     );
   });
@@ -174,21 +191,19 @@ describe("Avatar Token", function () {
 
   it("Unable to set a base URI if the collection already revealed", async function () {
     const baseUri = "ipfs://base_avatar_uri/";
-    await expect(token.connect(owner).setBaseURI(baseUri))
-      .to.emit(token, "SetBaseURI")
+    await expect(token.connect(owner).revealBabyAvatars(baseUri))
+      .to.emit(token, "Revealed")
       .withArgs(owner.address, baseUri);
 
     await expect(
-      token.connect(owner).setBaseURI("ipfs://another_base_uri")
+      token.connect(owner).revealBabyAvatars("ipfs://another_base_uri")
     ).to.be.revertedWith(collectionRevealedError);
   });
-
   it("Unable to mint a token to an account of contract type", async function () {
     await expect(token.connect(owner).mint(market.address)).to.be.revertedWith(
       badAddressError
     );
   });
-
   it("Unable to mint more tokens than the total supply specified", async function () {
     for (let i = 0; i < totalSupply; i++) {
       await expect(token.connect(owner).mint(addr1.address))
@@ -220,7 +235,7 @@ describe("Avatar Token", function () {
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
       .withArgs(owner.address, addr1.address, 1);
-    await token.connect(owner).setBaseURI("ipfs://base_avatar_uri/");
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
     await token.connect(owner).pause();
 
     await expect(token.connect(addr1).growUp(1)).to.be.revertedWith(
@@ -234,7 +249,7 @@ describe("Avatar Token", function () {
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
       .withArgs(owner.address, addr1.address, 1);
-    await token.connect(owner).setBaseURI("ipfs://base_avatar_uri/");
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await expect(token.connect(addr1).growUp(1)).to.be.revertedWith(
       growUpTimeError
@@ -247,7 +262,7 @@ describe("Avatar Token", function () {
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
       .withArgs(owner.address, addr1.address, 1);
-    await token.connect(owner).setBaseURI("ipfs://base_avatar_uri/");
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await expect(token.connect(addr2).growUp(1)).to.be.revertedWith(
       growUpOwnerError
@@ -266,7 +281,7 @@ describe("Avatar Token", function () {
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
       .withArgs(owner.address, addr1.address, 1);
-    await token.connect(owner).setBaseURI("ipfs://base_avatar_uri/");
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
     await ethers.provider.send("evm_mine"); // force mine
@@ -282,7 +297,7 @@ describe("Avatar Token", function () {
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
       .withArgs(owner.address, addr1.address, 1);
-    await token.connect(owner).setBaseURI("ipfs://base_avatar_uri/");
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
     await ethers.provider.send("evm_mine"); // force mine
@@ -339,7 +354,7 @@ describe("Avatar Token", function () {
     expect(await token.tokenURI(1)).to.equal(defaultBabyUri);
 
     const baseUri = "ipfs://base_avatar_uri/";
-    await token.connect(owner).setBaseURI(baseUri);
+    await token.connect(owner).revealBabyAvatars(baseUri);
 
     expect(await token.tokenURI(1)).to.equal(`${baseUri}/baby/1.json`);
   });
@@ -352,7 +367,7 @@ describe("Avatar Token", function () {
       .withArgs(owner.address, addr1.address, 1);
 
     const baseUri = "ipfs://base_avatar_uri/";
-    await token.connect(owner).setBaseURI(baseUri);
+    await token.connect(owner).revealBabyAvatars(baseUri);
 
     expect(await token.tokenURI(1)).to.equal(`${baseUri}/baby/1.json`);
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
@@ -377,7 +392,7 @@ describe("Avatar Token", function () {
       .withArgs(owner.address, addr1.address, 1);
 
     const baseUri = "ipfs://base_avatar_uri/";
-    await token.connect(owner).setBaseURI(baseUri);
+    await token.connect(owner).revealBabyAvatars(baseUri);
 
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
     await ethers.provider.send("evm_mine"); // force mine
