@@ -5,7 +5,7 @@ const contractsJson = fs.createWriteStream("contracts.json");
 const verifyContracts = fs.createWriteStream("verify_contracts.sh");
 
 /**
- * The following block is for testnet (Rinkeby).
+ * The following block is for testnet.
  * Must be changed for mainnet!
  * */
 const network = "ropsten";
@@ -62,16 +62,6 @@ async function main() {
   verifyContracts.write(
     `npx hardhat verify --network ${network} ${market.address} ${token.address} ${manager.address}\n`
   );
-
-  console.log("Configuring the roles...");
-  await manager.deployed();
-  const ceoRole = await manager.CEO_ROLE.call();
-  const cooRole = await manager.COO_ROLE.call();
-  const cfoRole = await manager.CFO_ROLE.call();
-
-  await manager.grantRole(ceoRole, ceo);
-  await manager.grantRole(cooRole, coo);
-  await manager.grantRole(cfoRole, cfo);
 
   console.log("Configuring the addresses...");
   await token.deployed();

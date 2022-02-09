@@ -38,7 +38,6 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
     uint private _priceOfGrowingUp;
     uint private _totalTokenSupply;
     string private _defaultBabyUri;
-    bool private _testMode;
 
     uint private _revealedAt = 0;
 
@@ -55,15 +54,13 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
         uint totalSupply,
         string memory defaultBabyUri,
         uint gt, uint price, 
-        address accessControl,
-        bool testMode) 
+        address accessControl) 
         ERC721("Novatar", "NVT") 
         BaseAccessControl(accessControl) {
         _totalTokenSupply = totalSupply;
         _defaultBabyUri = defaultBabyUri;
         _growTime = gt;
         _priceOfGrowingUp = price;
-        _testMode = testMode;
     }
 
     function totalTokenSupply() public view returns (uint) {
@@ -179,7 +176,7 @@ contract AvatarToken is ERC721, BaseAccessControl, Pausable {
     }
 
     function mint(address to) external returns (uint) {
-        require(_testMode || _msgSender() == avatarMarketAddress(), NOT_ENOUGH_PRIVILEGES_ERROR);
+        require(_msgSender() == avatarMarketAddress(), NOT_ENOUGH_PRIVILEGES_ERROR);
         require(!to.isContract(), BAD_ADDRESS_ERROR);
         require(currentTokenCount() < totalTokenSupply(), SUPPLY_LIMIT_ERROR);
         

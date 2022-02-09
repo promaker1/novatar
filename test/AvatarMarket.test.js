@@ -57,8 +57,7 @@ describe("Avatar Market", function () {
       defaultBabyUri,
       growUpTime,
       priceOfGrowingUp,
-      manager.address,
-      false
+      manager.address
     );
     await token.deployed();
 

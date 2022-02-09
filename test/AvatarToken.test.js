@@ -3,7 +3,6 @@ const { ethers } = require("hardhat");
 
 describe("Avatar Token", function () {
   let token;
-  let token0;
   let market;
   let manager;
   let owner;
@@ -22,7 +21,6 @@ describe("Avatar Token", function () {
   let collectionRevealedError;
   let collectionNotRevealedError;
 
-  let ceoRole;
   let cooRole;
   let cfoRole;
 
@@ -45,38 +43,22 @@ describe("Avatar Token", function () {
     );
     await manager.deployed();
 
-    ceoRole = await manager.CEO_ROLE.call();
     cooRole = await manager.COO_ROLE.call();
     cfoRole = await manager.CFO_ROLE.call();
 
-    await manager.grantRole(ceoRole, owner.address);
-    await manager.grantRole(cooRole, owner.address);
-    await manager.grantRole(cfoRole, owner.address);
-
     const avatarToken = await ethers.getContractFactory("AvatarToken");
-
-    token0 = await avatarToken.deploy(
-      totalSupply,
-      defaultBabyUri,
-      growUpTime,
-      priceOfGrowingUp,
-      manager.address,
-      false
-    );
-    await token0.deployed();
 
     token = await avatarToken.deploy(
       totalSupply,
       defaultBabyUri,
       growUpTime,
       priceOfGrowingUp,
-      manager.address,
-      true
+      manager.address
     );
     await token.deployed();
 
-    const avatarMarket = await ethers.getContractFactory("AvatarMarket");
-    market = await avatarMarket.deploy(token.address, manager.address);
+    const mockMarket = await ethers.getContractFactory("MockMarket");
+    market = await mockMarket.deploy(token.address);
     await market.deployed();
 
     nonExistentTokenError = await token.NON_EXISTENT_TOKEN_ERROR.call();
@@ -178,9 +160,9 @@ describe("Avatar Token", function () {
   });
 
   it("Only the market contract can invoke minting of new avatars", async function () {
-    await expect(token0.connect(addr1).mint(addr1.address)).to.be.revertedWith(
-      notEnoughPrivilegesError
-    );
+    await expect(
+      market.connect(addr1).buy(addr1.address, 1)
+    ).to.be.revertedWith(notEnoughPrivilegesError);
   });
 
   it("Unable to pass a regular account as a new market address", async function () {
@@ -200,29 +182,32 @@ describe("Avatar Token", function () {
     ).to.be.revertedWith(collectionRevealedError);
   });
   it("Unable to mint a token to an account of contract type", async function () {
-    await expect(token.connect(owner).mint(market.address)).to.be.revertedWith(
-      badAddressError
-    );
+    await token.setAvatarMarketAddress(market.address);
+    await expect(
+      market.connect(addr1).buy(market.address, 1)
+    ).to.be.revertedWith(badAddressError);
   });
   it("Unable to mint more tokens than the total supply specified", async function () {
+    await token.setAvatarMarketAddress(market.address);
     for (let i = 0; i < totalSupply; i++) {
-      await expect(token.connect(owner).mint(addr1.address))
+      await expect(market.connect(addr1).buy(addr1.address, 1))
         .to.emit(token, "Transfer")
         .withArgs(ethers.constants.AddressZero, addr1.address, i + 1)
         .to.emit(token, "AvatarCreated")
-        .withArgs(owner.address, addr1.address, i + 1);
+        .withArgs(market.address, addr1.address, i + 1);
     }
-    await expect(token.connect(owner).mint(addr1.address)).to.be.revertedWith(
-      supplyLimitError
-    );
+    await expect(
+      market.connect(addr1).buy(addr1.address, 1)
+    ).to.be.revertedWith(supplyLimitError);
   });
 
   it("Unable to grow up a token if the collection is not revealed yet", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
 
     await expect(token.connect(addr1).growUp(1)).to.be.revertedWith(
       collectionNotRevealedError
@@ -230,11 +215,12 @@ describe("Avatar Token", function () {
   });
 
   it("Unable to grow an avatar if the contract is paused", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
     await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
     await token.connect(owner).pause();
 
@@ -244,11 +230,12 @@ describe("Avatar Token", function () {
   });
 
   it("Unable to grow an avatar if the time has not come yet", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
     await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await expect(token.connect(addr1).growUp(1)).to.be.revertedWith(
@@ -257,11 +244,12 @@ describe("Avatar Token", function () {
   });
 
   it("Only the owner of a the given avatar can grow it up", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
     await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await expect(token.connect(addr2).growUp(1)).to.be.revertedWith(
@@ -276,11 +264,12 @@ describe("Avatar Token", function () {
   });
 
   it("Unable to grow an avatar up with wrong amount passed", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
     await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
@@ -292,11 +281,12 @@ describe("Avatar Token", function () {
   });
 
   it("Unable to grow the given avatar up more than once", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
     await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
 
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
@@ -316,11 +306,12 @@ describe("Avatar Token", function () {
   });
 
   it("Unable to set an adult image if the given avatar is not grown yet", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
 
     await expect(token.connect(owner).setAdultImage(1)).to.be.revertedWith(
       setAdultImageError
@@ -328,11 +319,12 @@ describe("Avatar Token", function () {
   });
 
   it("A new avatar can be minted. The default baby URI is returned.", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
 
     const avatar = await token.avatar(1);
     expect(avatar.grownAt).to.equal(0);
@@ -345,11 +337,12 @@ describe("Avatar Token", function () {
   });
 
   it("The collection is revealed. The token URI returns a new value.", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
 
     expect(await token.tokenURI(1)).to.equal(defaultBabyUri);
 
@@ -360,11 +353,12 @@ describe("Avatar Token", function () {
   });
 
   it("A token has been grown up. The token URI returns the default value temporary.", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
 
     const baseUri = "ipfs://base_avatar_uri/";
     await token.connect(owner).revealBabyAvatars(baseUri);
@@ -385,11 +379,12 @@ describe("Avatar Token", function () {
   });
 
   it("An adult image has been set up for the given avatar. The token URI returns a new value.", async function () {
-    await expect(token.connect(owner).mint(addr1.address))
+    await token.setAvatarMarketAddress(market.address);
+    await expect(market.connect(addr1).buy(addr1.address, 1))
       .to.emit(token, "Transfer")
       .withArgs(ethers.constants.AddressZero, addr1.address, 1)
       .to.emit(token, "AvatarCreated")
-      .withArgs(owner.address, addr1.address, 1);
+      .withArgs(market.address, addr1.address, 1);
 
     const baseUri = "ipfs://base_avatar_uri/";
     await token.connect(owner).revealBabyAvatars(baseUri);
