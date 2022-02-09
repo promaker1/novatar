@@ -5,17 +5,16 @@ const contractsJson = fs.createWriteStream("contracts.json");
 const verifyContracts = fs.createWriteStream("verify_contracts.sh");
 
 /**
- * The following block is for testnet.
+ * The following block is for testnet (Rinkeby).
  * Must be changed for mainnet!
  * */
-const network = "ropsten";
-const ceo = "0x6F4C6c4d5C8f93555Cede0400fe7616e1678Db70";
-const coo = "0x6F4C6c4d5C8f93555Cede0400fe7616e1678Db70";
-const cfo = "0x6F4C6c4d5C8f93555Cede0400fe7616e1678Db70";
+const network = "rinkeby";
+const ceo = "0x849F14342BC8aA5A368368d85515a16C19b79B18";
+const cfo = "0xfCc78E83706B3ecEc54B481d6c3b3a99010436f4";
 /** ======= The end of the block ======= */
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const [deployer, coo] = await ethers.getSigners();
   console.log("Deploying contracts with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
@@ -23,15 +22,15 @@ async function main() {
     "AccessControlManager"
   );
   const manager = await AccessControlManager.deploy(
-    deployer.address,
+    deployer.address, // set default admin to deployer. MUST be changed!
     ceo,
-    coo,
+    coo.address,
     cfo
   );
   console.log("Access control manager address:", manager.address);
   contractsJson.write(`{\n\t"manager":"${manager.address}",\n`);
   verifyContracts.write(
-    `npx hardhat verify --network ${network} ${manager.address} ${deployer.address} ${ceo} ${coo} ${cfo}\n`
+    `npx hardhat verify --network ${network} ${manager.address} ${deployer.address} ${ceo} ${coo.address} ${cfo}\n`
   );
 
   const AvatarToken = await ethers.getContractFactory("AvatarToken");
@@ -63,9 +62,13 @@ async function main() {
     `npx hardhat verify --network ${network} ${market.address} ${token.address} ${manager.address}\n`
   );
 
+  console.log("Configuring the roles...");
+  await manager.deployed();
+
   console.log("Configuring the addresses...");
   await token.deployed();
-  await token.setAvatarMarketAddress(market.address);
+  await market.deployed();
+  await token.connect(coo).setAvatarMarketAddress(market.address);
 
   console.log("Done.");
 }
