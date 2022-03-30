@@ -7,6 +7,6 @@ typechain
 #Hardhat files
 cache
 artifacts
-contracts.json
-verify_contracts.sh
+*contracts.json
+*.sh
 .DS_Store

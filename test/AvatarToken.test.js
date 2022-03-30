@@ -13,6 +13,8 @@ describe("Avatar Token", function () {
   let notEnoughPrivilegesError;
   let badAddressError;
   let badAmountError;
+  let badCidError;
+  let cidSetError;
   let supplyLimitError;
   let growUpOwnerError;
   let growUpTimeError;
@@ -25,6 +27,7 @@ describe("Avatar Token", function () {
   let cfoRole;
 
   const defaultBabyUri = "ipfs://DEFAULT_BABY_CID";
+  const defaultAdultCid = "DEFAULT_ADULT_CID";
   const totalSupply = 10;
   const growUpTime = 30 * 24 * 60 * 60;
   const priceOfGrowingUp = ethers.utils.parseEther("0.05");
@@ -51,6 +54,7 @@ describe("Avatar Token", function () {
     token = await avatarToken.deploy(
       totalSupply,
       defaultBabyUri,
+      defaultAdultCid,
       growUpTime,
       priceOfGrowingUp,
       manager.address
@@ -65,6 +69,8 @@ describe("Avatar Token", function () {
     notEnoughPrivilegesError = await token.NOT_ENOUGH_PRIVILEGES_ERROR.call();
     badAddressError = await token.BAD_ADDRESS_ERROR.call();
     badAmountError = await token.BAD_AMOUNT_ERROR.call();
+    badCidError = await token.BAD_CID_ERROR.call();
+    cidSetError = await token.CID_SET_ERROR.call();
     supplyLimitError = await token.SUPPLY_LIMIT_ERROR.call();
     growUpOwnerError = await token.GROW_UP_OWNER_ERROR.call();
     growUpTimeError = await token.GROW_UP_TIME_ERROR.call();
@@ -105,6 +111,23 @@ describe("Avatar Token", function () {
     );
   });
 
+  it("Only a user with COO role can set a new base URI", async function () {
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
+    await expect(
+      token.connect(addr1).setBaseURI("ipfs://new_uri")
+    ).to.be.revertedWith(
+      `AccessControl: account ${addr1.address
+        .toString()
+        .toLowerCase()} is missing role ${cooRole}`
+    );
+  });
+
+  it("Unable to set a new base URI for the collection if it is non revealed", async function () {
+    await expect(
+      token.connect(owner).setBaseURI("ipfs://new_uri")
+    ).to.be.revertedWith(collectionNotRevealedError);
+  });
+
   it("Only a user with COO role can set a base URI and reveal the tokens", async function () {
     await expect(
       token.connect(addr1).revealBabyAvatars("ipfs://base_uri")
@@ -116,7 +139,9 @@ describe("Avatar Token", function () {
   });
 
   it("Only a user with COO role can set an adult image for the given token", async function () {
-    await expect(token.connect(addr1).setAdultImage(1)).to.be.revertedWith(
+    await expect(
+      token.connect(addr1).setAdultImage(1, "token_adult_cid")
+    ).to.be.revertedWith(
       `AccessControl: account ${addr1.address
         .toString()
         .toLowerCase()} is missing role ${cooRole}`
@@ -137,6 +162,52 @@ describe("Avatar Token", function () {
         .toString()
         .toLowerCase()} is missing role ${cooRole}`
     );
+  });
+
+  it("Cannot set a CID with a length of less than 46 symbols", async function () {
+    await token.setAvatarMarketAddress(market.address);
+    await market.connect(addr1).buy(addr1.address, 1);
+
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
+
+    await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
+    await ethers.provider.send("evm_mine"); // force mine
+
+    await token.connect(addr1).growUp(1, {
+      value: priceOfGrowingUp,
+    });
+
+    await expect(
+      token.connect(owner).setAdultImage(1, "token_adult_cid")
+    ).to.be.revertedWith(badCidError);
+  });
+
+  it("Unable to set a CID for an adult avatar more than once", async function () {
+    await token.setAvatarMarketAddress(market.address);
+    await market.connect(addr1).buy(addr1.address, 1);
+
+    await token.connect(owner).revealBabyAvatars("ipfs://base_avatar_uri/");
+
+    await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
+    await ethers.provider.send("evm_mine"); // force mine
+
+    await token.connect(addr1).growUp(1, {
+      value: priceOfGrowingUp,
+    });
+
+    await expect(
+      token
+        .connect(owner)
+        .setAdultImage(1, "QmNRCQWfgze6AbBCaT1rkrkV5tJ2aP4oTNPb5JZcXYywve")
+    )
+      .to.emit(token, "SetAdultImage")
+      .withArgs(owner.address, 1);
+
+    await expect(
+      token
+        .connect(owner)
+        .setAdultImage(1, "QmNRCQWfgze6AbBCaT1rkrkV5tJ2aP4oTNPb5JZcXYywva")
+    ).to.be.revertedWith(cidSetError);
   });
 
   it("Only a user with CFO role can set a new price of growing up", async function () {
@@ -171,7 +242,7 @@ describe("Avatar Token", function () {
     ).to.be.revertedWith(badAddressError);
   });
 
-  it("Unable to set a base URI if the collection already revealed", async function () {
+  it("The collection can be revealed only once", async function () {
     const baseUri = "ipfs://base_avatar_uri/";
     await expect(token.connect(owner).revealBabyAvatars(baseUri))
       .to.emit(token, "Revealed")
@@ -313,9 +384,9 @@ describe("Avatar Token", function () {
       .to.emit(token, "AvatarCreated")
       .withArgs(market.address, addr1.address, 1);
 
-    await expect(token.connect(owner).setAdultImage(1)).to.be.revertedWith(
-      setAdultImageError
-    );
+    await expect(
+      token.connect(owner).setAdultImage(1, "new_adult_cid")
+    ).to.be.revertedWith(setAdultImageError);
   });
 
   it("A new avatar can be minted. The default baby URI is returned.", async function () {
@@ -332,7 +403,7 @@ describe("Avatar Token", function () {
       (await ethers.provider.getBlock()).timestamp
     );
     // eslint-disable-next-line no-unused-expressions
-    expect(avatar.hasAdultImage).to.be.false;
+    expect(await token.hasAdultImage(1)).to.be.false;
     expect(await token.tokenURI(1)).to.equal(defaultBabyUri);
   });
 
@@ -346,10 +417,15 @@ describe("Avatar Token", function () {
 
     expect(await token.tokenURI(1)).to.equal(defaultBabyUri);
 
-    const baseUri = "ipfs://base_avatar_uri/";
+    const baseUri = "ipfs://base_avatar_uri";
     await token.connect(owner).revealBabyAvatars(baseUri);
 
-    expect(await token.tokenURI(1)).to.equal(`${baseUri}/baby/1.json`);
+    expect(await token.tokenURI(1)).to.equal(`${baseUri}/1.json`);
+
+    const newBaseUri = "ipfs://new_base_avatar_uri";
+    await token.connect(owner).setBaseURI(newBaseUri);
+
+    expect(await token.tokenURI(1)).to.equal(`${newBaseUri}/1.json`);
   });
 
   it("A token has been grown up. The token URI returns the default value temporary.", async function () {
@@ -360,22 +436,22 @@ describe("Avatar Token", function () {
       .to.emit(token, "AvatarCreated")
       .withArgs(market.address, addr1.address, 1);
 
-    const baseUri = "ipfs://base_avatar_uri/";
+    const baseUri = "ipfs://base_avatar_uri";
     await token.connect(owner).revealBabyAvatars(baseUri);
 
-    expect(await token.tokenURI(1)).to.equal(`${baseUri}/baby/1.json`);
+    expect(await token.tokenURI(1)).to.equal(`${baseUri}/1.json`);
     await ethers.provider.send("evm_increaseTime", [growUpTime]); // added grow period
     await ethers.provider.send("evm_mine"); // force mine
 
     await token.connect(addr1).growUp(1, { value: priceOfGrowingUp });
-    expect(await token.tokenURI(1)).to.equal(`${baseUri}/adult/default.json`);
+    expect(await token.tokenURI(1)).to.equal(`ipfs://${defaultAdultCid}`);
 
     const avatar = await token.avatar(1);
     expect(avatar.grownAt).to.equal(
       (await ethers.provider.getBlock()).timestamp
     );
     // eslint-disable-next-line no-unused-expressions
-    expect(avatar.hasAdultImage).to.be.false;
+    expect(await token.hasAdultImage(1)).to.be.false;
   });
 
   it("An adult image has been set up for the given avatar. The token URI returns a new value.", async function () {
@@ -393,15 +469,15 @@ describe("Avatar Token", function () {
     await ethers.provider.send("evm_mine"); // force mine
 
     await token.connect(addr1).growUp(1, { value: priceOfGrowingUp });
-    expect(await token.tokenURI(1)).to.equal(`${baseUri}/adult/default.json`);
+    expect(await token.tokenURI(1)).to.equal(`ipfs://${defaultAdultCid}`);
 
-    await expect(token.connect(owner).setAdultImage(1))
+    const newCid = "QmNRCQWfgze6AbBCaT1rkrkV5tJ2aP4oTNPb5JZcXYywve";
+    await expect(token.connect(owner).setAdultImage(1, newCid))
       .to.emit(token, "SetAdultImage")
       .withArgs(owner.address, 1);
 
-    expect(await token.tokenURI(1)).to.equal(`${baseUri}/adult/1.json`);
-    const avatar = await token.avatar(1);
+    expect(await token.tokenURI(1)).to.equal(`ipfs://${newCid}`);
     // eslint-disable-next-line no-unused-expressions
-    expect(avatar.hasAdultImage).to.be.true;
+    expect(await token.hasAdultImage(1)).to.be.true;
   });
 });

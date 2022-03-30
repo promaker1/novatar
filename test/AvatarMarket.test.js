@@ -24,6 +24,7 @@ describe("Avatar Market", function () {
   let cfoRole;
 
   const defaultBabyUri = "http://DEFAULT_BABY_CID";
+  const defaultAdultCid = "DEFAULT_ADULT_CID";
 
   beforeEach(async function () {
     [owner, addr1, addr2, addr3] = await ethers.getSigners();
@@ -55,6 +56,7 @@ describe("Avatar Market", function () {
     token = await avatarToken.deploy(
       totalSupply,
       defaultBabyUri,
+      defaultAdultCid,
       growUpTime,
       priceOfGrowingUp,
       manager.address
